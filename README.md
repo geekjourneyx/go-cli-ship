@@ -55,7 +55,8 @@ make release-check
 .
 ├── README.md
 └── skills/
-    └── SKILL.md
+    └── go-cli-ship/
+        └── SKILL.md
 ```
 
 ## 仓库初始化（Git）
@@ -71,4 +72,3 @@ git remote add origin git@github.com:geekjourneyx/go-cli-ship.git
 - 错误处理使用稳定错误码，避免依赖错误文案匹配
 - 发布前统一检查版本一致性（`install.sh` / Makefile / CHANGELOG）
 - 所有门禁命令保持无交互，确保 CI 可稳定执行
-
