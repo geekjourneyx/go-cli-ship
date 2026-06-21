@@ -1,0 +1,35 @@
+{
+  "name": "__NPM_PACKAGE_NAME__",
+  "version": "1.0.0",
+  "description": "Install the __CLI_NAME__ CLI from the matching GitHub Release bundle.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/__GITHUB_REPO__.git"
+  },
+  "homepage": "https://github.com/__GITHUB_REPO__#readme",
+  "bugs": {
+    "url": "https://github.com/__GITHUB_REPO__/issues"
+  },
+  "bin": {
+    "__CLI_NAME__": "scripts/run.js"
+  },
+  "scripts": {
+    "pack:check": "npm pack --json --dry-run",
+    "postinstall": "node scripts/install.js"
+  },
+  "files": [
+    "scripts/install.js",
+    "scripts/run.js",
+    "skills/**",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,74 +1,101 @@
 # go-cli-ship
 
-一个面向 Agent 的 Go CLI 生产级交付 Skill，帮助你把 `需求 -> 设计 -> 开发 -> 测试 -> 发布 -> 安装` 变成可复用、可审计、可自动化的标准流程。
+**Production-grade delivery workflow for Go CLI projects, packaged as an Agent Skill.**
 
-## 推荐安装
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+
+`go-cli-ship` helps agents and developers turn a Go command-line tool into a reproducible product: stable CLI contracts, testable Go code, npm-based binary installation, GitHub Release automation, checksum verification, optional Agent Skill packaging, and release gates that catch drift before publishing.
+
+## Install
 
 ```bash
-npx skills add https://github.com/geekjourneyx/go-cli-ship --skill go-cli-ship
+npx skills add geekjourneyx/go-cli-ship
 ```
 
-## 这个 Skill 解决什么问题
+After installing the skill, ask your agent to use `go-cli-ship` when creating, hardening, or releasing a Go CLI.
 
-- 从 0 到 1 搭建 Go CLI 项目工程骨架
-- 把现有 CLI 提升到可发布、可维护、可扩展
-- 统一团队和 Agent 的工程规范，减少“每次重来”
-
-## 核心能力
-
-- 需求到交付的端到端执行流程（建模、实现、测试、发布）
-- 生产级质量门禁（`fmt`/`vet`/`lint`/`test`/`release-check`）
-- CI/CD 与发版规范（多平台构建、checksum、SemVer）
-- 安装脚本与文档规范（`install.sh`、`CHANGELOG.md`、`AGENTS.md`）
-
-## 快速使用
-
-安装后，在你的 Agent 对话中明确提出目标即可，例如：
+## Quick Start
 
 ```text
-请使用 go-cli-ship，帮我从 0 到 1 搭建一个 Go CLI：
-- 目标：批量上传文件到对象存储
-- 约束：支持 --json 输出，要求可自动化部署
-- 门禁：go vet / golangci-lint / go test / release-check 必须通过
+Use go-cli-ship to scaffold a production Go CLI named acme-sync.
+
+Requirements:
+- support human output and --json output
+- install through npm
+- publish GitHub Release artifacts with SHA256SUMS
+- include make release-check as the final quality gate
 ```
 
-Skill 会引导并落地以下产物：
+The skill will guide the work from command contract to release verification instead of only generating a folder tree.
 
-- CLI 命令与参数设计（含人类可读输出与机器可读 JSON 输出）
-- 标准工程目录（`cmd/`、`pkg/`、`e2e/`、`scripts/`）
-- Makefile、GitHub Workflows、发布与安装脚本
-- CHANGELOG 与文档同步更新规范
+## Why It Exists
 
-## 最低质量门禁（建议）
+Go CLIs often start clean and become fragile at release time. The hard parts are usually not the command parser; they are version consistency, npm wrapper behavior, artifact naming, checksums, CI parity, fresh-install smoke tests, and keeping bundled Agent Skill content out of source code.
+
+`go-cli-ship` captures those release lessons as reusable instructions and templates so each CLI can ship with the same minimum standard.
+
+## What You Get
+
+- A production-oriented Go CLI project shape: `cmd/`, `internal/`, `e2e/`, `scripts/`, `.github/workflows/`, and optional `skills/`.
+- CLI contract guidance for human output, `--json`, stable stderr diagnostics, exit codes, and noninteractive automation.
+- npm distribution templates that download the matching GitHub Release binary and verify `SHA256SUMS`.
+- GitHub Actions templates for CI, multi-platform release artifacts, npm smoke tests, and publish flow.
+- Agent Skill packaging rules that keep `skills/` content-only and optionally expose safe `skills list/read` commands.
+- A `release-check` template that blocks placeholder drift, version drift, missing files, bad package contents, and common release mistakes.
+
+## Included Templates
+
+```text
+templates/
+├── github/workflows/
+│   ├── ci.yml
+│   └── release.yml
+├── go/internal/skillcontent/
+│   ├── reader.go
+│   ├── reader_test.go
+│   └── source.go
+├── npm/
+│   ├── package.json
+│   └── scripts/
+│       ├── install.js
+│       └── run.js
+└── scripts/
+    └── release-check.sh
+```
+
+The templates intentionally use placeholders. Replace them before running checks:
 
 ```bash
-gofmt -l .
-go vet ./...
-golangci-lint run
-CGO_ENABLED=1 go test -count=1 ./...
+rg "__[A-Z0-9_]+__" .
+node -c scripts/install.js
+node -c scripts/run.js
+bash -n scripts/release-check.sh
+```
+
+If the placeholder scan returns any result, the scaffold is not ready.
+
+## Release Standard
+
+For a generated or upgraded CLI, the expected final gate is:
+
+```bash
 make release-check
 ```
 
-## 仓库结构
+A complete gate should cover formatting, `go vet`, tests, linting, npm package contents, README install commands, version alignment, release workflow requirements, and fresh install behavior when distribution code changes.
 
-```text
-.
-├── README.md
-└── skills/
-    └── go-cli-ship/
-        └── SKILL.md
-```
+Before pushing a release tag, confirm the version, npm package name, GitHub repository, `NPM_TOKEN`, release-check result, and fresh npm install smoke test.
 
-## 仓库初始化（Git）
+## Skill Boundary
 
-```bash
-git branch -M main
-git remote add origin git@github.com:geekjourneyx/go-cli-ship.git
-```
+This repository is an Agent Skill and template pack, not a general Go framework.
 
-## 最佳实践建议
+Use it when you need a repeatable delivery path for a Go CLI. Do not put Go source files, generated binaries, changelog entries, or internal maintenance notes inside `skills/`; that directory is for agent-facing instructions only.
 
-- 始终为自动化场景提供稳定的 `--json` 输出契约
-- 错误处理使用稳定错误码，避免依赖错误文案匹配
-- 发布前统一检查版本一致性（`install.sh` / Makefile / CHANGELOG）
-- 所有门禁命令保持无交互，确保 CI 可稳定执行
+## License
+
+[MIT](./LICENSE)
+
+## Author
+
+Maintained by [geekjourneyx](https://github.com/geekjourneyx).

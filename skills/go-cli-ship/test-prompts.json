@@ -1,0 +1,17 @@
+[
+  {
+    "id": "new-go-cli",
+    "prompt": "Use go-cli-ship to scaffold a production Go CLI named acme-sync. It should support human output, --json output, npm install, GitHub Release artifacts, and release-check.",
+    "expected": "Produces a concrete implementation plan or edits that define CLI contract, project shape, npm wrapper, release workflow, checksums, and verification commands."
+  },
+  {
+    "id": "release-drift",
+    "prompt": "Use go-cli-ship to fix a Go CLI release where package.json is 1.2.0, the tag is v1.2.1, npm publish failed, and SHA256SUMS does not match the artifacts.",
+    "expected": "Stops before publishing, diagnoses version drift and checksum failure, gives exact recovery steps, and requires release-check plus fresh install smoke before retry."
+  },
+  {
+    "id": "skill-packaging",
+    "prompt": "Use go-cli-ship to add Agent Skill packaging to an existing Go CLI. The package should include skills/** and expose skills list/read safely.",
+    "expected": "Keeps skills/ content-only, places reader code under internal/skillcontent, rejects traversal, wires npm SKILLS_DIR, and adds CI/release smoke tests."
+  }
+]

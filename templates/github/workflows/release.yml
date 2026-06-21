@@ -1,0 +1,264 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  checks:
+    name: Release checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: __GO_VERSION_FILE__
+          cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Run release check
+        run: make release-check
+
+  build:
+    name: Build ${{ matrix.goos }} ${{ matrix.goarch }}
+    needs: checks
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            ext: ""
+            archive: tar.gz
+          - goos: linux
+            goarch: arm64
+            ext: ""
+            archive: tar.gz
+          - goos: darwin
+            goarch: amd64
+            ext: ""
+            archive: tar.gz
+          - goos: darwin
+            goarch: arm64
+            ext: ""
+            archive: tar.gz
+          - goos: windows
+            goarch: amd64
+            ext: ".exe"
+            archive: zip
+          - goos: windows
+            goarch: arm64
+            ext: ".exe"
+            archive: zip
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: __GO_VERSION_FILE__
+          cache: true
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          NAME="__CLI_NAME___${VERSION}_${GOOS}_${GOARCH}"
+          mkdir -p "dist/${NAME}"
+          go build -buildvcs=false -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o "dist/${NAME}/__CLI_NAME__${{ matrix.ext }}" __GO_MAIN_PACKAGE__
+          cp README.md LICENSE CHANGELOG.md "dist/${NAME}/"
+          if [ -d skills ]; then cp -R skills "dist/${NAME}/"; fi
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            (cd dist && zip -r "${NAME}.zip" "${NAME}")
+          else
+            tar -C dist -czf "dist/${NAME}.tar.gz" "${NAME}"
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: __CLI_NAME__-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/__CLI_NAME___*.${{ matrix.archive }}
+          if-no-files-found: error
+
+  smoke-npm:
+    name: Smoke npm installer
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: __CLI_NAME__-*
+          merge-multiple: true
+
+      - name: Smoke npm package against release artifacts
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum __CLI_NAME___* > SHA256SUMS
+          cd ..
+
+          pack_dir="$(mktemp -d)"
+          prefix_dir="$(mktemp -d)"
+
+          npm pack --pack-destination "$pack_dir" >/dev/null
+          tarball="$(find "$pack_dir" -maxdepth 1 -name '*.tgz' -print -quit)"
+          test -n "$tarball"
+
+          __RELEASE_ENV_PREFIX___RELEASE_BASE_URL="${GITHUB_WORKSPACE}/dist" \
+          npm install -g "$tarball" --prefix "$prefix_dir"
+
+          "$prefix_dir/bin/__CLI_NAME__" version
+          if "$prefix_dir/bin/__CLI_NAME__" skills list --json >/dev/null 2>&1; then
+            "$prefix_dir/bin/__CLI_NAME__" skills read __SKILL_NAME__ --json
+          fi
+
+  smoke-npm-windows:
+    name: Smoke npm installer on Windows
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: __CLI_NAME__-*
+          merge-multiple: true
+
+      - name: Smoke npm package against release artifacts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $distDir = Join-Path $env:GITHUB_WORKSPACE 'dist'
+          $packDir = Join-Path $env:RUNNER_TEMP '__CLI_NAME__-npm-pack'
+          $prefixDir = Join-Path $env:RUNNER_TEMP '__CLI_NAME__-npm-prefix'
+
+          Remove-Item -Force -Recurse $packDir, $prefixDir -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $packDir, $prefixDir | Out-Null
+
+          Get-ChildItem $distDir -Filter '__CLI_NAME___*' |
+            Sort-Object Name |
+            ForEach-Object {
+              $hash = (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLowerInvariant()
+              "$hash  $($_.Name)"
+            } | Set-Content -Encoding ascii (Join-Path $distDir 'SHA256SUMS')
+
+          npm pack --pack-destination $packDir | Out-Null
+          $tarball = Get-ChildItem $packDir -Filter *.tgz | Select-Object -First 1
+          if (-not $tarball) {
+            throw 'npm pack did not produce a tarball'
+          }
+
+          $env:__RELEASE_ENV_PREFIX___RELEASE_BASE_URL = $distDir
+          npm install -g $tarball.FullName --prefix $prefixDir
+
+          $packageRoot = npm root -g --prefix $prefixDir | Select-Object -Last 1
+          $packageNamePath = '__NPM_PACKAGE_NAME__'.Replace('/', '\')
+          $packageDir = Join-Path $packageRoot $packageNamePath
+          node (Join-Path $packageDir 'scripts\run.js') version
+          node (Join-Path $packageDir 'scripts\run.js') skills list --json *> $null
+          if ($LASTEXITCODE -eq 0) {
+            node (Join-Path $packageDir 'scripts\run.js') skills read __SKILL_NAME__ --json
+          }
+
+  publish:
+    name: Publish GitHub release
+    needs:
+      - build
+      - smoke-npm
+      - smoke-npm-windows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: __CLI_NAME__-*
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum __CLI_NAME___* > SHA256SUMS
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/__CLI_NAME___*
+            dist/SHA256SUMS
+          generate_release_notes: true
+
+  publish-npm:
+    name: Publish npm package
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check npm token
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NPM_TOKEN}" ]; then
+            echo "NPM_TOKEN is required to publish __NPM_PACKAGE_NAME__" >&2
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Verify package version matches tag
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          package_version="$(node -p "require('./package.json').version")"
+          if [ "$package_version" != "$version" ]; then
+            echo "package.json version ${package_version} does not match tag ${GITHUB_REF_NAME}" >&2
+            exit 1
+          fi
+
+      - name: Publish npm package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
