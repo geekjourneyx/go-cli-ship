@@ -2,6 +2,8 @@
 
 **Production-grade delivery workflow for Go CLI projects, packaged as an Agent Skill.**
 
+<img src="assets/banner.webp" alt="go-cli-ship - Ship Go CLIs with release discipline" width="100%">
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
 `go-cli-ship` helps agents and developers turn a Go command-line tool into a reproducible product: stable CLI contracts, testable Go code, npm-based binary installation, GitHub Release automation, checksum verification, optional Agent Skill packaging, and release gates that catch drift before publishing.
@@ -36,7 +38,7 @@ Go CLIs often start clean and become fragile at release time. The hard parts are
 
 ## What You Get
 
-- A production-oriented Go CLI project shape: `cmd/`, `internal/`, `e2e/`, `scripts/`, `.github/workflows/`, and optional `skills/`.
+- A production-oriented Go CLI project shape: `cmd/`, `internal/`, `e2e/`, `scripts/`, `.github/workflows/`, and optional bundled skills.
 - CLI contract guidance for human output, `--json`, stable stderr diagnostics, exit codes, and noninteractive automation.
 - npm distribution templates that download the matching GitHub Release binary and verify `SHA256SUMS`.
 - GitHub Actions templates for CI, multi-platform release artifacts, npm smoke tests, and publish flow.
@@ -90,7 +92,7 @@ Before pushing a release tag, confirm the version, npm package name, GitHub repo
 
 This repository is an Agent Skill and template pack, not a general Go framework.
 
-Use it when you need a repeatable delivery path for a Go CLI. Do not put Go source files, generated binaries, changelog entries, or internal maintenance notes inside `skills/`; that directory is for agent-facing instructions only.
+Use it when you need a repeatable delivery path for a Go CLI. For generated CLIs that bundle Agent Skills, keep skill content separate from Go source files, generated binaries, changelog entries, and internal maintenance notes.
 
 ## License
 
